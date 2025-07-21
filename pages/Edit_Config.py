@@ -39,9 +39,10 @@ config["scope1_emission_factor"] = st.number_input(
 # --- UI: Chemistry Emissions (kg CO₂/kWh) ---
 st.subheader("⚗️ Battery Chemistry Emissions (kg CO₂ / kWh)")
 for chem in config["battery_chemistry_emissions"]:
+    val = float(config["battery_chemistry_emissions"][chem])
     config["battery_chemistry_emissions"][chem] = st.number_input(
         f"{chem} Emission Factor",
-        value=config["battery_chemistry_emissions"][chem],
+        value=val,
         step=1.0,
         key=f"chem_{chem}"
     )
