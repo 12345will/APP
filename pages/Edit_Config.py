@@ -62,9 +62,10 @@ st.subheader("📈 Carbon Price Paths (€/tCO₂)")
 for scenario in config["carbon_price_paths"]:
     st.markdown(f"**{scenario} Scenario**")
     for yr in config["carbon_price_paths"][scenario]:
+        val = float(config["carbon_price_paths"][scenario][yr])
         config["carbon_price_paths"][scenario][yr] = st.number_input(
             f"{scenario} {yr}",
-            value=config["carbon_price_paths"][scenario][yr],
+            value=val,
             step=5.0,
             key=f"{scenario}_{yr}"
         )
