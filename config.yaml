@@ -1,0 +1,56 @@
+energy_demand_per_cell_kwh: 0.01  # GWh
+
+energy_emission_factors:
+  Grid:
+    India: 0.75
+    UK: 0.25
+    Global Average: 0.50
+  PPA: 0.05
+  Gas: 0.20
+
+scope1_emission_factor: 0.1  # tCO2/GWh
+
+battery_chemistry_emissions:
+  LFP: 55     # kg CO2/kWh
+  NMC 622: 75
+  NMC 811: 85
+
+energy_costs_eur_per_kwh:
+  Grid: 0.10
+  PPA: 0.07
+  Gas: 0.09
+
+carbon_price_paths:
+  Low:
+    2026: 50
+    2027: 55
+    2028: 60
+    2029: 65
+    2030: 70
+    2031: 75
+    2032: 80
+    2033: 85
+    2034: 90
+    2035: 95
+  Medium:
+    2026: 75
+    2027: 82.5
+    2028: 90
+    2029: 97.5
+    2030: 105
+    2031: 112.5
+    2032: 120
+    2033: 127.5
+    2034: 135
+    2035: 142.5
+  High:
+    2026: 100
+    2027: 110
+    2028: 120
+    2029: 130
+    2030: 140
+    2031: 150
+    2032: 160
+    2033: 170
+    2034: 180
+    2035: 190
