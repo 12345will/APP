@@ -39,7 +39,7 @@ pack_kwh = st.sidebar.number_input("kWh per Pack", value=60.0, step=1.0)
 
 carbon_price_scenario = st.sidebar.selectbox("Carbon Price Scenario", ["Low", "Medium", "High"])
 
-# --- Emissions and Cost Factors from Config ---
+# --- Load Variables from Config ---
 energy_demand_per_cell_kwh = config["energy_demand_per_cell_kwh"]
 grid_factor = config["energy_emission_factors"]["Grid"][factory]
 ppa_factor = config["energy_emission_factors"]["PPA"]
@@ -67,10 +67,10 @@ def run_simulation(years):
             energy_cost = energy_gwh * 1000 * (0.7 * energy_costs["Grid"] + 0.3 * energy_costs["Gas"])
 
         total_kwh = (total_cells_produced / cells_per_pack) * pack_kwh
-        scope3 = (total_kwh * chemistry_ef[battery_chemistry]) / 1000  # tCO2
+        scope3 = (total_kwh * chemistry_ef[battery_chemistry]) / 1000  # kg → t
 
         total_emissions = scope1 + scope2 + scope3
-        carbon_price = carbon_prices[str(yr)]
+        carbon_price = carbon_prices[int(yr)]
         carbon_cost = total_emissions * carbon_price
 
         results.append({
@@ -98,4 +98,4 @@ else:
     st.write("Switch to cumulative mode to view multi-year trends.")
 
 st.markdown("---")
-st.markdown("✅ **Configurable assumptions loaded from `config.yaml`. Update that file to change emission factors, energy costs, or carbon prices.**")
+st.markdown("✅ **All emission factors and cost assumptions are loaded from `config.yaml`.** Edit that file to customize the tool's behavior.")
