@@ -2,14 +2,35 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import yaml
+import os
 
-# --- Load Config from YAML ---
-@st.cache_data
-def load_config():
-    with open("config.yaml", "r") as file:
-        return yaml.safe_load(file)
+# --- File path to config.yaml ---
+CONFIG_FILE = "config.yaml"
 
-config = load_config()
+# --- Load and optionally edit config ---
+def load_editable_config():
+    # Read the current config.yaml file
+    with open(CONFIG_FILE, "r") as f:
+        config_text = f.read()
+
+    st.sidebar.markdown("### 🛠️ Edit config.yaml below")
+    edited_text = st.sidebar.text_area("YAML Config", config_text, height=500)
+
+    if st.sidebar.button("🔁 Reload with Edited Config"):
+        try:
+            # Try parsing to ensure it's valid YAML
+            config_dict = yaml.safe_load(edited_text)
+            with open(CONFIG_FILE, "w") as f:
+                yaml.safe_dump(config_dict, f)
+            st.success("✅ Config updated! Please rerun the app.")
+            st.experimental_rerun()
+        except Exception as e:
+            st.error(f"❌ YAML syntax error: {e}")
+
+    return yaml.safe_load(edited_text)
+
+# --- Load the config on app start ---
+config = load_editable_config()
 
 # --- Sidebar Inputs ---
 st.sidebar.title("Factory Scenario Configuration")
@@ -98,4 +119,4 @@ else:
     st.write("Switch to cumulative mode to view multi-year trends.")
 
 st.markdown("---")
-st.markdown("✅ **All emission factors and cost assumptions are loaded from `config.yaml`.** Edit that file to customize the tool's behavior.")
+st.markdown("✅ **Edit `config.yaml` directly above to change emission factors, prices, and assumptions.**")
