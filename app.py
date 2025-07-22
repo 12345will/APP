@@ -25,6 +25,7 @@ def init_session():
         "chemistry": "LFP",
         "scope1_emission_factor": 0.18,
         "carbon_price": 80.0,
+        "electricity_mix": "100% Grid",
         "materials": {
             "lithium": 0.0,
             "nickel": 0.0,
@@ -60,6 +61,7 @@ if page == "Input Settings":
     st.session_state.phev_percent = st.slider("% of cells for PHEV", 0, 100, 100 if st.session_state.selected_year > 2030 else st.session_state.phev_percent)
 
     st.subheader("Energy Sourcing")
+    st.session_state.electricity_mix = st.selectbox("Electricity Sourcing Strategy", ["100% Grid", "PPA : Grid (70:30)", "Grid + Gas (30% demand)"])
     st.session_state.grid_emission = st.number_input("Grid Emission Factor (tCO₂/kWh)", value=st.session_state.grid_emission)
     st.session_state.renewable_emission = st.number_input("Renewable Emission Factor (tCO₂/kWh)", value=st.session_state.renewable_emission)
     st.session_state.gas_emission = st.number_input("Gas Emission Factor (tCO₂/kWh)", value=st.session_state.gas_emission)
@@ -93,8 +95,19 @@ else:
     phev_percent = st.session_state.phev_percent
     mhev_percent = 0 if st.session_state.selected_year > 2030 else 100 - phev_percent
 
-    emission_factor = 0.7 * st.session_state.grid_emission + 0.3 * st.session_state.renewable_emission  # Example
-    energy_cost = 0.7 * st.session_state.grid_cost + 0.3 * st.session_state.renew_cost
+    if st.session_state.electricity_mix == "100% Grid":
+        emission_factor = st.session_state.grid_emission
+        energy_cost = st.session_state.grid_cost
+    elif st.session_state.electricity_mix == "PPA : Grid (70:30)":
+        emission_factor = 0.7 * st.session_state.renewable_emission + 0.3 * st.session_state.grid_emission
+        energy_cost = 0.7 * st.session_state.renew_cost + 0.3 * st.session_state.grid_cost
+    elif st.session_state.electricity_mix == "Grid + Gas (30% demand)":
+        emission_factor = 0.7 * st.session_state.grid_emission + 0.3 * st.session_state.gas_emission
+        energy_cost = 0.7 * st.session_state.grid_cost + 0.3 * st.session_state.gas_cost
+    else:
+        emission_factor = st.session_state.grid_emission
+        energy_cost = st.session_state.grid_cost
+
     total_energy_kwh = (total_cells / st.session_state.cells_per_pack) * st.session_state.pack_kwh
     scope2_emissions = total_energy_kwh * emission_factor
     scope1_emissions = total_energy_kwh * st.session_state.scope1_emission_factor * 0.05
