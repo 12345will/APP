@@ -12,7 +12,6 @@ def init_session():
         "factory": "India",
         "year_mode": "Single Year",
         "selected_year": 2026,
-        "num_lines": 2,
         "mla_percent": 50,
         "phev_percent": 60,
         "grid_emission": 0.21,
@@ -57,7 +56,6 @@ if page == "Input Settings":
     st.session_state.factory = st.selectbox("Factory Location", ["India", "UK", "Global Average"], index=["India", "UK", "Global Average"].index(st.session_state.factory))
     st.session_state.year_mode = st.radio("Year Mode", ["Single Year", "Cumulative (2026–YYYY)"], index=0 if st.session_state.year_mode == "Single Year" else 1)
     st.session_state.selected_year = st.slider("Select Year", min_value=2026, max_value=2035, value=st.session_state.selected_year)
-    st.session_state.num_lines = st.slider("Number of Manufacturing Lines", 1, 10, st.session_state.num_lines)
     st.session_state.mla_percent = st.slider("% MLA production", 0, 100, st.session_state.mla_percent)
     st.session_state.phev_percent = st.slider("% of cells for PHEV", 0, 100, 100 if st.session_state.selected_year > 2030 else st.session_state.phev_percent)
 
@@ -86,7 +84,12 @@ if page == "Input Settings":
 else:
     st.title("📊 Scenario Outputs")
     year_range = list(range(2026, st.session_state.selected_year + 1)) if st.session_state.year_mode.startswith("Cumulative") else [st.session_state.selected_year]
-    total_cells = st.session_state.num_lines * 4_150_000 * len(year_range)
+
+    # Fixed lines based on factory
+    lines_by_factory = {"India": 3, "UK": 2, "Global Average": 2.5}
+    num_lines = lines_by_factory.get(st.session_state.factory, 2)
+
+    total_cells = num_lines * 4_150_000 * len(year_range)
     phev_percent = st.session_state.phev_percent
     mhev_percent = 0 if st.session_state.selected_year > 2030 else 100 - phev_percent
 
