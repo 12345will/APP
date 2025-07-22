@@ -61,7 +61,9 @@ if page == "Input Settings":
     st.session_state.phev_percent = st.slider("% of cells for PHEV", 0, 100, 100 if st.session_state.selected_year > 2030 else st.session_state.phev_percent)
 
     st.subheader("Energy Sourcing")
-    st.session_state.electricity_mix = st.selectbox("Electricity Sourcing Strategy", ["100% Grid", "PPA : Grid (70:30)", "Grid + Gas (30% demand)"])
+    electricity_options = ["100% Grid", "PPA : Grid (70:30)", "Grid + Gas (30% demand)"]
+    st.session_state.electricity_mix = st.radio("Electricity Sourcing Strategy", electricity_options, index=electricity_options.index(st.session_state.electricity_mix))
+
     st.session_state.grid_emission = st.number_input("Grid Emission Factor (tCO₂/kWh)", value=st.session_state.grid_emission)
     st.session_state.renewable_emission = st.number_input("Renewable Emission Factor (tCO₂/kWh)", value=st.session_state.renewable_emission)
     st.session_state.gas_emission = st.number_input("Gas Emission Factor (tCO₂/kWh)", value=st.session_state.gas_emission)
