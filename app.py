@@ -49,6 +49,7 @@ def get_uk_emission_table():
 uk_emission_table = get_uk_emission_table()
 
 # ------------------ SESSION STATE INIT ------------------
+
 def init_session():
     defaults = {
         "factory": "India",
@@ -66,6 +67,7 @@ def init_session():
         "chemistry": "LFP",
         "scope1_emission_factor": 0.18,
         "carbon_price": 80.0,
+        "grid_emission_factor": 70.0,
         "electricity_mix": "100% Grid",
         "materials": {
             "lithium": 0.0,
