@@ -6,7 +6,7 @@ st.set_page_config(page_title="Agratas Carbon & Cost Scenario Tool", layout="wid
 # ------------------ PAGE SELECTION ------------------
 page = st.sidebar.radio("Navigate", ["Input Settings", "Scenario Outputs"])
 
-# ------------------ FIXED ANNUAL CO2 VALUES FOR UK (tCO2) ------------------
+# ------------------ FIXED ANNUAL CO2 EMISSIONS VALUES FOR UK (tCO2) ------------------
 custom_uk_emissions = {
     "100% Grid": {
         2026: 610,
@@ -57,9 +57,10 @@ def init_session():
         "grid_cost": 0.10,
         "renew_cost": 0.08,
         "gas_cost": 0.12,
-        "mla_pack_kwh": 50.0,
-        "ema_pack_kwh": 75.0,
-        "cells_per_pack": 100.0,
+        "mla_pack_kwh": 122,
+        "ema_pack_kwh": 114,
+        "mla_cells_per_pack": 344,
+        "ema_cells_per_pack": 188,
         "chemistry": "LFP",
         "scope1_emission_factor": 0.18,
         "carbon_price": 80.0,
@@ -109,7 +110,8 @@ if page == "Input Settings":
     st.subheader("Battery Pack & Materials")
     st.session_state.mla_pack_kwh = st.number_input("MLA Pack capacity (kWh)", value=st.session_state.mla_pack_kwh)
     st.session_state.ema_pack_kwh = st.number_input("EMA Pack capacity (kWh)", value=st.session_state.ema_pack_kwh)
-    st.session_state.cells_per_pack = st.number_input("Cells per pack", value=st.session_state.cells_per_pack)
+    st.session_state.mla_cells_per_pack = st.number_input("MLA Cells per pack", value=st.session_state.mla_cells_per_pack)
+    st.session_state.ema_cells_per_pack = st.number_input("EMA Cells per pack", value=st.session_state.ema_cells_per_pack)
     st.session_state.chemistry = st.selectbox("Battery Chemistry", ["LFP", "NMC 811", "NMC 622"], index=["LFP", "NMC 811", "NMC 622"].index(st.session_state.chemistry))
 
     for mat in st.session_state.materials:
@@ -125,7 +127,6 @@ else:
     st.title("📊 Scenario Outputs")
     year_range = list(range(2026, st.session_state.selected_year + 1)) if st.session_state.year_mode.startswith("Cumulative") else [st.session_state.selected_year]
 
-    # Fixed lines based on factory
     lines_by_factory = {"India": 3, "UK": 2, "Global Average": 2.5}
     num_lines = lines_by_factory.get(st.session_state.factory, 2)
 
@@ -136,7 +137,6 @@ else:
     phev_percent = st.session_state.phev_percent
     mhev_percent = 0 if st.session_state.selected_year > 2030 else 100 - phev_percent
 
-    # Use fixed annual emissions from UK as base
     annual_emissions = []
     for y in year_range:
         uk_value = custom_uk_emissions[st.session_state.electricity_mix].get(y, 0.0)
@@ -145,15 +145,15 @@ else:
         elif st.session_state.factory == "India":
             annual_emissions.append((uk_value / 2) * 3)
         else:
-            annual_emissions.append((uk_value + ((uk_value / 2) * 3)) / 2)  # avg of UK and India
+            annual_emissions.append((uk_value + ((uk_value / 2) * 3)) / 2)
 
     scope2_emissions = sum(annual_emissions)
 
-    total_energy_kwh = (mla_cells / st.session_state.cells_per_pack) * st.session_state.mla_pack_kwh + \
-                       (ema_cells / st.session_state.cells_per_pack) * st.session_state.ema_pack_kwh
+    mla_energy = (mla_cells / st.session_state.mla_cells_per_pack) * st.session_state.mla_pack_kwh
+    ema_energy = (ema_cells / st.session_state.ema_cells_per_pack) * st.session_state.ema_pack_kwh
+    total_energy_kwh = mla_energy + ema_energy
 
     scope1_emissions = total_energy_kwh * st.session_state.scope1_emission_factor * 0.05
-
     scope3_emissions = sum((total_cells * st.session_state.materials[mat] * (st.session_state.co2_per_kg[mat] / 1000)) for mat in st.session_state.materials)
     total_emissions = scope1_emissions + scope2_emissions + scope3_emissions
 
@@ -175,3 +175,4 @@ else:
     st.metric("Total Energy Cost (€)", f"€{energy_cost_total:,.0f}")
 
     st.success("Adjust values on the Input Settings page to simulate scenarios.")
+
