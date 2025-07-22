@@ -1,92 +1,136 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-import yaml
 
-# --- Load Config ---
-@st.cache_data
-def load_config():
-    with open("config.yaml", "r") as file:
-        return yaml.safe_load(file)
+st.set_page_config(page_title="Agratas Carbon & Cost Scenario Tool")
+st.title("Agratas Carbon Sensitivity & Scenario Analysis (2026–2035)")
 
-config = load_config()
+# ------------------ SECTION 1: FACTORY & YEAR ------------------
+st.header("1. Factory Selection and Timeline")
 
-# --- Sidebar Inputs ---
-st.sidebar.title("Factory Scenario Configuration")
-factory = st.sidebar.selectbox("Factory Location", ["India", "UK", "Global Average"])
-timeline_mode = st.sidebar.radio("Select Time Mode", ["Yearly", "Cumulative (2026–2035)"])
-if timeline_mode == "Yearly":
-    year = st.sidebar.selectbox("Select Year", list(range(2026, 2036)))
-    year_range = [year]
+factory = st.selectbox("Select Factory Location", ["India", "UK", "Global Average"])
+year_mode = st.radio("Select Year Mode", ["Single Year", "Cumulative (2026–YYYY)"])
+selected_year = st.slider("Select Year", min_value=2026, max_value=2035, value=2026)
+
+if year_mode == "Cumulative (2026–YYYY)":
+    year_range = list(range(2026, selected_year + 1))
+    st.write(f"Cumulative period: {year_range[0]}–{year_range[-1]} ({len(year_range)} years)")
 else:
-    year_range = list(range(2026, 2036))
+    year_range = [selected_year]
 
-energy_mix = st.sidebar.radio("Energy Sourcing Strategy", ["100% Grid", "Grid + PPA (70:30)", "Grid + Gas Backup (70:30)"])
-total_cells_produced = st.sidebar.number_input("Total Cells Produced per Year", value=4150000, step=100000)
-mla_pct = st.sidebar.slider("% MLA", 0, 100, 50)
-ema_pct = 100 - mla_pct
-phev_pct = st.sidebar.slider("% PHEV", 0, 100, 50)
-mhev_pct = 100 - phev_pct
-if timeline_mode == "Yearly" and year > 2030:
-    mhev_pct = 0
+# Factory emission settings (placeholders for actual data)
+factory_data = {
+    "India": {"grid_intensity": 0.75, "waste_heat": 0.10, "renewables": 0.60},
+    "UK": {"grid_intensity": 0.21, "waste_heat": 0.20, "renewables": 0.80},
+    "Global Average": {"grid_intensity": 0.45, "waste_heat": 0.15, "renewables": 0.70}
+}
 
-battery_chemistry = st.sidebar.selectbox("Battery Chemistry", ["LFP", "NMC 622", "NMC 811"])
-cells_per_pack = st.sidebar.number_input("Cells per Pack", value=100, step=10)
-pack_kwh = st.sidebar.number_input("kWh per Pack", value=60.0, step=1.0)
-carbon_price_scenario = st.sidebar.selectbox("Carbon Price Scenario", ["Low", "Medium", "High"])
+factory_profile = factory_data[factory]
 
-# --- Load Config Variables ---
-energy_demand_per_cell_kwh = config["energy_demand_per_cell_kwh"]
-grid_factor = config["energy_emission_factors"]["Grid"][factory]
-ppa_factor = config["energy_emission_factors"]["PPA"]
-gas_factor = config["energy_emission_factors"]["Gas"]
-scope1_factor = config["scope1_emission_factor"]
-chemistry_ef = config["battery_chemistry_emissions"]
-energy_costs = config["energy_costs_eur_per_kwh"]
-carbon_prices = config["carbon_price_paths"][carbon_price_scenario]
+# ------------------ SECTION 2: ENERGY SOURCING STRATEGY ------------------
+st.header("2. Energy Sourcing Strategy")
 
-# --- Run Model ---
-def run_simulation(years):
-    results = []
-    for yr in years:
-        energy_gwh = total_cells_produced * energy_demand_per_cell_kwh
-        scope1 = energy_gwh * scope1_factor
-        if energy_mix == "100% Grid":
-            scope2 = energy_gwh * grid_factor
-            energy_cost = energy_gwh * 1000 * energy_costs["Grid"]
-        elif energy_mix == "Grid + PPA (70:30)":
-            scope2 = energy_gwh * (0.7 * grid_factor + 0.3 * ppa_factor)
-            energy_cost = energy_gwh * 1000 * (0.7 * energy_costs["Grid"] + 0.3 * energy_costs["PPA"])
-        else:
-            scope2 = energy_gwh * (0.7 * grid_factor + 0.3 * gas_factor)
-            energy_cost = energy_gwh * 1000 * (0.7 * energy_costs["Grid"] + 0.3 * energy_costs["Gas"])
-        total_kwh = (total_cells_produced / cells_per_pack) * pack_kwh
-        scope3 = (total_kwh * chemistry_ef[battery_chemistry]) / 1000
-        total_emissions = scope1 + scope2 + scope3
-        carbon_price = carbon_prices[int(yr)]
-        carbon_cost = total_emissions * carbon_price
+energy_mix = st.selectbox("Select Energy Strategy", ["100% Grid", "Grid + Renewable PPA (70:30)", "Grid + Gas Backup (30%)"])
 
-        results.append({
-            "Year": yr,
-            "Scope 1 (tCO₂)": round(scope1, 2),
-            "Scope 2 (tCO₂)": round(scope2, 2),
-            "Scope 3 (tCO₂)": round(scope3, 2),
-            "Total Emissions (tCO₂)": round(total_emissions, 2),
-            "Carbon Cost (€)": round(carbon_cost, 2),
-            "Energy Cost (€)": round(energy_cost, 2)
-        })
-    return pd.DataFrame(results)
+grid_emission = factory_profile["grid_intensity"]  # tCO2/kWh
+renewable_emission = st.number_input("Renewable PPA emission factor (tCO₂/kWh)", value=0.05)
+gas_emission = st.number_input("Gas emission factor (tCO₂/kWh)", value=0.20)
 
-# --- Display Results ---
-df_results = run_simulation(year_range)
+grid_cost = st.number_input("Grid electricity cost (€/kWh)", value=0.10)
+renew_cost = st.number_input("Renewable PPA cost (€/kWh)", value=0.08)
+gas_cost = st.number_input("Gas cost (€/kWh)", value=0.12)
 
-st.title("🔋 Battery Manufacturing Carbon Scenario Tool")
-st.subheader(f"Results for Factory: {factory}, Chemistry: {battery_chemistry}")
-st.dataframe(df_results)
+if energy_mix == "100% Grid":
+    emission_factor = grid_emission
+    energy_cost = grid_cost
+elif energy_mix == "Grid + Renewable PPA (70:30)":
+    emission_factor = 0.7 * grid_emission + 0.3 * renewable_emission
+    energy_cost = 0.7 * grid_cost + 0.3 * renew_cost
+elif energy_mix == "Grid + Gas Backup (30%)":
+    emission_factor = 0.7 * grid_emission + 0.3 * gas_emission
+    energy_cost = 0.7 * grid_cost + 0.3 * gas_cost
 
-if len(df_results) > 1:
-    st.subheader("📈 Emissions and Carbon Cost Over Time")
-    st.line_chart(df_results.set_index("Year")[["Total Emissions (tCO₂)", "Carbon Cost (€)"]])
+# ------------------ SECTION 3: BATTERY PRODUCTION CONFIGURATION ------------------
+st.header("3. Battery Production Setup")
 
-st.markdown("---")
-st.markdown("📄 Edit assumptions in the *Edit_Config* tab.")
+num_lines = st.slider("Number of Manufacturing Lines", 1, 10, 2)
+cells_per_line = 4_150_000
+
+mla_percent = st.slider("% MLA production", 0, 100, 50)
+ema_percent = 100 - mla_percent
+
+phev_percent = st.slider("% of cells for PHEV (MHEV disabled after 2030)", 0, 100, 100 if selected_year > 2030 else 60)
+mhev_percent = 0 if selected_year > 2030 else 100 - phev_percent
+
+# ------------------ SECTION 4: BATTERY PACK CONFIGURATION ------------------
+st.header("4. Battery Pack Configuration")
+
+chemistry = st.selectbox("Battery Chemistry", ["LFP", "NMC 811", "NMC 622"])
+pack_kwh = st.number_input("Pack capacity (kWh)", value=50.0)
+cells_per_pack = st.number_input("Number of cells per pack", value=100.0)
+
+# Materials per cell input (kg)
+st.subheader("Material Breakdown per Cell (kg)")
+lithium = st.number_input("Lithium", value=0.0)
+nickel = st.number_input("Nickel", value=0.0)
+cobalt = st.number_input("Cobalt", value=0.0)
+manganese = st.number_input("Manganese", value=0.0)
+graphite = st.number_input("Graphite", value=0.0)
+aluminum = st.number_input("Aluminum", value=0.0)
+copper = st.number_input("Copper", value=0.0)
+
+# ------------------ SECTION 5: EMISSIONS CALCULATION ENGINE ------------------
+st.header("5. Emissions & Cost Calculation")
+
+total_cells = num_lines * cells_per_line * len(year_range)
+total_energy_mwh = (total_cells / cells_per_pack) * pack_kwh / 1000  # MWh
+total_energy_kwh = total_energy_mwh * 1000
+
+scope2_emissions = total_energy_kwh * emission_factor  # tCO₂
+scope1_emission_factor = st.number_input("Scope 1 emission factor (tCO₂/kWh)", value=0.18)
+scope1_emissions = total_energy_kwh * scope1_emission_factor * 0.05  # example on-site fraction
+
+# Scope 3 emissions (materials)
+st.subheader("Scope 3 Emissions from Materials")
+co2_per_kg = {
+    "lithium": st.number_input("tCO₂/ton - Lithium", value=5.0),
+    "nickel": st.number_input("tCO₂/ton - Nickel", value=8.0),
+    "cobalt": st.number_input("tCO₂/ton - Cobalt", value=10.0),
+    "manganese": st.number_input("tCO₂/ton - Manganese", value=4.0),
+    "graphite": st.number_input("tCO₂/ton - Graphite", value=2.5),
+    "aluminum": st.number_input("tCO₂/ton - Aluminum", value=9.0),
+    "copper": st.number_input("tCO₂/ton - Copper", value=3.5)
+}
+
+material_weights = {
+    "lithium": lithium,
+    "nickel": nickel,
+    "cobalt": cobalt,
+    "manganese": manganese,
+    "graphite": graphite,
+    "aluminum": aluminum,
+    "copper": copper
+}
+
+scope3_emissions = sum((total_cells * kg * (co2_per_kg[mat]/1000)) for mat, kg in material_weights.items())
+total_emissions = scope1_emissions + scope2_emissions + scope3_emissions
+
+# ------------------ SECTION 6: COST TO BUSINESS ------------------
+st.header("6. Cost to Business")
+carbon_price = st.number_input("Carbon price (€/tCO₂)", value=80.0)
+total_carbon_cost = total_emissions * carbon_price
+energy_cost_total = total_energy_kwh * energy_cost
+
+# ------------------ SECTION 7: OUTPUTS ------------------
+st.header("7. Scenario Outputs")
+
+st.subheader("Emissions Summary")
+st.metric("Scope 1 Emissions (tCO₂)", f"{scope1_emissions:,.0f}")
+st.metric("Scope 2 Emissions (tCO₂)", f"{scope2_emissions:,.0f}")
+st.metric("Scope 3 Emissions (tCO₂)", f"{scope3_emissions:,.0f}")
+st.metric("Total Emissions (tCO₂)", f"{total_emissions:,.0f}")
+
+st.subheader("Cost Summary")
+st.metric("Total Carbon Cost (€)", f"€{total_carbon_cost:,.0f}")
+st.metric("Total Energy Cost (€)", f"€{energy_cost_total:,.0f}")
+
+st.success("Scenario simulation complete. Adjust inputs to test new assumptions or compare alternatives.")
