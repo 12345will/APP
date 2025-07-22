@@ -9,7 +9,7 @@ page = st.sidebar.radio("Navigate", ["Input Settings", "Scenario Outputs"])
 
 # ------------------ FIXED ANNUAL ENERGY DEMAND FOR UK (GWh) ------------------
 custom_uk_energy = {
-    2026: 6,
+    2026: 120,
     2027: 125,
     2028: 130,
     2029: 135,
@@ -23,7 +23,7 @@ custom_uk_energy = {
 
 # ------------------ FIXED EMISSION FACTORS FOR 100% GRID (tCO2/GWh) ------------------
 custom_emission_factors = {
-    2026: 94.59,
+    2026: 70,
     2027: 68.0,
     2028: 65.0,
     2029: 62.0,
