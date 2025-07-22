@@ -2,110 +2,114 @@ import streamlit as st
 import pandas as pd
 
 st.set_page_config(page_title="Agratas Carbon & Cost Scenario Tool", layout="wide")
-st.title("Agratas Carbon Sensitivity & Scenario Analysis (2026–2035)")
 
-# Sidebar for configuration
-st.sidebar.header("🔧 Model Configuration")
+# ------------------ PAGE SELECTION ------------------
+page = st.sidebar.radio("Navigate", ["Input Settings", "Scenario Outputs"])
 
-# ------------------ SIDEBAR CONFIGURATION ------------------
-factory = st.sidebar.selectbox("Factory Location", ["India", "UK", "Global Average"])
-year_mode = st.sidebar.radio("Year Mode", ["Single Year", "Cumulative (2026–YYYY)"])
-selected_year = st.sidebar.slider("Select Year", min_value=2026, max_value=2035, value=2026)
-num_lines = st.sidebar.slider("Number of Manufacturing Lines", 1, 10, 2)
-cells_per_line = 4_150_000
+# ------------------ SESSION STATE INIT ------------------
+def init_session():
+    defaults = {
+        "factory": "India",
+        "year_mode": "Single Year",
+        "selected_year": 2026,
+        "num_lines": 2,
+        "mla_percent": 50,
+        "phev_percent": 60,
+        "grid_emission": 0.21,
+        "renewable_emission": 0.05,
+        "gas_emission": 0.20,
+        "grid_cost": 0.10,
+        "renew_cost": 0.08,
+        "gas_cost": 0.12,
+        "pack_kwh": 50.0,
+        "cells_per_pack": 100.0,
+        "chemistry": "LFP",
+        "scope1_emission_factor": 0.18,
+        "carbon_price": 80.0,
+        "materials": {
+            "lithium": 0.0,
+            "nickel": 0.0,
+            "cobalt": 0.0,
+            "manganese": 0.0,
+            "graphite": 0.0,
+            "aluminum": 0.0,
+            "copper": 0.0
+        },
+        "co2_per_kg": {
+            "lithium": 5.0,
+            "nickel": 8.0,
+            "cobalt": 10.0,
+            "manganese": 4.0,
+            "graphite": 2.5,
+            "aluminum": 9.0,
+            "copper": 3.5
+        }
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
-mla_percent = st.sidebar.slider("% MLA production", 0, 100, 50)
-phev_percent = st.sidebar.slider("% of cells for PHEV", 0, 100, 100 if selected_year > 2030 else 60)
-mhev_percent = 0 if selected_year > 2030 else 100 - phev_percent
+init_session()
 
-energy_mix = st.sidebar.selectbox("Energy Strategy", ["100% Grid", "Grid + Renewable PPA (70:30)", "Grid + Gas Backup (30%)"])
-grid_emission = st.sidebar.number_input("Grid Emission Factor (tCO₂/kWh)", value=0.21)
-renewable_emission = st.sidebar.number_input("Renewable Emission Factor (tCO₂/kWh)", value=0.05)
-gas_emission = st.sidebar.number_input("Gas Emission Factor (tCO₂/kWh)", value=0.20)
+# ------------------ INPUT PAGE ------------------
+if page == "Input Settings":
+    st.title("⚙️ Model Configuration")
+    st.session_state.factory = st.selectbox("Factory Location", ["India", "UK", "Global Average"], index=["India", "UK", "Global Average"].index(st.session_state.factory))
+    st.session_state.year_mode = st.radio("Year Mode", ["Single Year", "Cumulative (2026–YYYY)"], index=0 if st.session_state.year_mode == "Single Year" else 1)
+    st.session_state.selected_year = st.slider("Select Year", min_value=2026, max_value=2035, value=st.session_state.selected_year)
+    st.session_state.num_lines = st.slider("Number of Manufacturing Lines", 1, 10, st.session_state.num_lines)
+    st.session_state.mla_percent = st.slider("% MLA production", 0, 100, st.session_state.mla_percent)
+    st.session_state.phev_percent = st.slider("% of cells for PHEV", 0, 100, 100 if st.session_state.selected_year > 2030 else st.session_state.phev_percent)
 
-grid_cost = st.sidebar.number_input("Grid Cost (€/kWh)", value=0.10)
-renew_cost = st.sidebar.number_input("Renewable Cost (€/kWh)", value=0.08)
-gas_cost = st.sidebar.number_input("Gas Cost (€/kWh)", value=0.12)
+    st.subheader("Energy Sourcing")
+    st.session_state.grid_emission = st.number_input("Grid Emission Factor (tCO₂/kWh)", value=st.session_state.grid_emission)
+    st.session_state.renewable_emission = st.number_input("Renewable Emission Factor (tCO₂/kWh)", value=st.session_state.renewable_emission)
+    st.session_state.gas_emission = st.number_input("Gas Emission Factor (tCO₂/kWh)", value=st.session_state.gas_emission)
+    st.session_state.grid_cost = st.number_input("Grid Cost (€/kWh)", value=st.session_state.grid_cost)
+    st.session_state.renew_cost = st.number_input("Renewable Cost (€/kWh)", value=st.session_state.renew_cost)
+    st.session_state.gas_cost = st.number_input("Gas Cost (€/kWh)", value=st.session_state.gas_cost)
 
-pack_kwh = st.sidebar.number_input("Pack capacity (kWh)", value=50.0)
-cells_per_pack = st.sidebar.number_input("Cells per pack", value=100.0)
-chemistry = st.sidebar.selectbox("Battery Chemistry", ["LFP", "NMC 811", "NMC 622"])
+    st.subheader("Battery Pack & Materials")
+    st.session_state.pack_kwh = st.number_input("Pack capacity (kWh)", value=st.session_state.pack_kwh)
+    st.session_state.cells_per_pack = st.number_input("Cells per pack", value=st.session_state.cells_per_pack)
+    st.session_state.chemistry = st.selectbox("Battery Chemistry", ["LFP", "NMC 811", "NMC 622"], index=["LFP", "NMC 811", "NMC 622"].index(st.session_state.chemistry))
 
-scope1_emission_factor = st.sidebar.number_input("Scope 1 emission factor (tCO₂/kWh)", value=0.18)
-carbon_price = st.sidebar.number_input("Carbon price (€/tCO₂)", value=80.0)
+    for mat in st.session_state.materials:
+        st.session_state.materials[mat] = st.number_input(f"{mat.capitalize()} per cell (kg)", value=st.session_state.materials[mat])
+    for mat in st.session_state.co2_per_kg:
+        st.session_state.co2_per_kg[mat] = st.number_input(f"tCO₂/ton - {mat.capitalize()}", value=st.session_state.co2_per_kg[mat])
 
-# Material inputs
-total_cells = num_lines * cells_per_line * (selected_year - 2025 if year_mode.startswith("Cumulative") else 1)
+    st.session_state.scope1_emission_factor = st.number_input("Scope 1 Emission Factor (tCO₂/kWh)", value=st.session_state.scope1_emission_factor)
+    st.session_state.carbon_price = st.number_input("Carbon Price (€/tCO₂)", value=st.session_state.carbon_price)
 
-st.sidebar.subheader("Materials per Cell (kg)")
-lithium = st.sidebar.number_input("Lithium", value=0.0)
-nickel = st.sidebar.number_input("Nickel", value=0.0)
-cobalt = st.sidebar.number_input("Cobalt", value=0.0)
-manganese = st.sidebar.number_input("Manganese", value=0.0)
-graphite = st.sidebar.number_input("Graphite", value=0.0)
-aluminum = st.sidebar.number_input("Aluminum", value=0.0)
-copper = st.sidebar.number_input("Copper", value=0.0)
-
-# Material CO₂ factors (tCO₂/ton)
-co2_per_kg = {
-    "lithium": st.sidebar.number_input("tCO₂/ton - Lithium", value=5.0),
-    "nickel": st.sidebar.number_input("tCO₂/ton - Nickel", value=8.0),
-    "cobalt": st.sidebar.number_input("tCO₂/ton - Cobalt", value=10.0),
-    "manganese": st.sidebar.number_input("tCO₂/ton - Manganese", value=4.0),
-    "graphite": st.sidebar.number_input("tCO₂/ton - Graphite", value=2.5),
-    "aluminum": st.sidebar.number_input("tCO₂/ton - Aluminum", value=9.0),
-    "copper": st.sidebar.number_input("tCO₂/ton - Copper", value=3.5)
-}
-
-# ------------------ MAIN DISPLAY ------------------
-if year_mode == "Cumulative (2026–YYYY)":
-    year_range = list(range(2026, selected_year + 1))
+# ------------------ OUTPUT PAGE ------------------
 else:
-    year_range = [selected_year]
+    st.title("📊 Scenario Outputs")
+    year_range = list(range(2026, st.session_state.selected_year + 1)) if st.session_state.year_mode.startswith("Cumulative") else [st.session_state.selected_year]
+    total_cells = st.session_state.num_lines * 4_150_000 * len(year_range)
+    phev_percent = st.session_state.phev_percent
+    mhev_percent = 0 if st.session_state.selected_year > 2030 else 100 - phev_percent
 
-# Emission and energy cost logic
-if energy_mix == "100% Grid":
-    emission_factor = grid_emission
-    energy_cost = grid_cost
-elif energy_mix == "Grid + Renewable PPA (70:30)":
-    emission_factor = 0.7 * grid_emission + 0.3 * renewable_emission
-    energy_cost = 0.7 * grid_cost + 0.3 * renew_cost
-elif energy_mix == "Grid + Gas Backup (30%)":
-    emission_factor = 0.7 * grid_emission + 0.3 * gas_emission
-    energy_cost = 0.7 * grid_cost + 0.3 * gas_cost
+    emission_factor = 0.7 * st.session_state.grid_emission + 0.3 * st.session_state.renewable_emission  # Example
+    energy_cost = 0.7 * st.session_state.grid_cost + 0.3 * st.session_state.renew_cost
+    total_energy_kwh = (total_cells / st.session_state.cells_per_pack) * st.session_state.pack_kwh
+    scope2_emissions = total_energy_kwh * emission_factor
+    scope1_emissions = total_energy_kwh * st.session_state.scope1_emission_factor * 0.05
 
-# Energy and emissions calculations
-total_energy_kwh = (total_cells / cells_per_pack) * pack_kwh
-total_energy_mwh = total_energy_kwh / 1000
-scope2_emissions = total_energy_kwh * emission_factor
-scope1_emissions = total_energy_kwh * scope1_emission_factor * 0.05
+    scope3_emissions = sum((total_cells * st.session_state.materials[mat] * (st.session_state.co2_per_kg[mat] / 1000)) for mat in st.session_state.materials)
+    total_emissions = scope1_emissions + scope2_emissions + scope3_emissions
 
-material_weights = {
-    "lithium": lithium,
-    "nickel": nickel,
-    "cobalt": cobalt,
-    "manganese": manganese,
-    "graphite": graphite,
-    "aluminum": aluminum,
-    "copper": copper
-}
-scope3_emissions = sum((total_cells * kg * (co2_per_kg[mat]/1000)) for mat, kg in material_weights.items())
-total_emissions = scope1_emissions + scope2_emissions + scope3_emissions
+    total_carbon_cost = total_emissions * st.session_state.carbon_price
+    energy_cost_total = total_energy_kwh * energy_cost
 
-# Business cost outputs
-total_carbon_cost = total_emissions * carbon_price
-energy_cost_total = total_energy_kwh * energy_cost
+    st.subheader("Emissions")
+    st.metric("Scope 1 Emissions (tCO₂)", f"{scope1_emissions:,.0f}")
+    st.metric("Scope 2 Emissions (tCO₂)", f"{scope2_emissions:,.0f}")
+    st.metric("Scope 3 Emissions (tCO₂)", f"{scope3_emissions:,.0f}")
+    st.metric("Total Emissions (tCO₂)", f"{total_emissions:,.0f}")
 
-# ------------------ RESULTS ------------------
-st.header("Scenario Outputs")
-st.subheader("Emissions")
-st.metric("Scope 1 Emissions (tCO₂)", f"{scope1_emissions:,.0f}")
-st.metric("Scope 2 Emissions (tCO₂)", f"{scope2_emissions:,.0f}")
-st.metric("Scope 3 Emissions (tCO₂)", f"{scope3_emissions:,.0f}")
-st.metric("Total Emissions (tCO₂)", f"{total_emissions:,.0f}")
+    st.subheader("Cost to Business")
+    st.metric("Total Carbon Cost (€)", f"€{total_carbon_cost:,.0f}")
+    st.metric("Total Energy Cost (€)", f"€{energy_cost_total:,.0f}")
 
-st.subheader("Cost to Business")
-st.metric("Total Carbon Cost (€)", f"€{total_carbon_cost:,.0f}")
-st.metric("Total Energy Cost (€)", f"€{energy_cost_total:,.0f}")
-
-st.success("Adjust configuration in the sidebar to explore different scenarios.")
+    st.success("Adjust values on the Input Settings page to simulate scenarios.")
