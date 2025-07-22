@@ -6,6 +6,46 @@ st.set_page_config(page_title="Agratas Carbon & Cost Scenario Tool", layout="wid
 # ------------------ PAGE SELECTION ------------------
 page = st.sidebar.radio("Navigate", ["Input Settings", "Scenario Outputs"])
 
+# ------------------ FIXED ANNUAL CO2 VALUES FOR UK (tCO2) ------------------
+custom_uk_emissions = {
+    "100% Grid": {
+        2026: 610,
+        2027: 20037,
+        2028: 21018,
+        2029: 17757,
+        2030: 22280,
+        2031: 18719,
+        2032: 14743,
+        2033: 11701,
+        2034: 9412,
+        2035: 9400,
+    },
+    "PPA : Grid (70:30)": {
+        2026: 242,
+        2027: 8598,
+        2028: 9436,
+        2029: 8457,
+        2030: 10941,
+        2031: 9873,
+        2032: 8680,
+        2033: 7768,
+        2034: 7081,
+        2035: 7000,
+    },
+    "Grid + Gas (30% demand)": {
+        2026: 818,
+        2027: 31272,
+        2028: 35568,
+        2029: 33303,
+        2030: 43984,
+        2031: 41491,
+        2032: 38707,
+        2033: 36578,
+        2034: 34976,
+        2035: 34900,
+    }
+}
+
 # ------------------ SESSION STATE INIT ------------------
 def init_session():
     defaults = {
@@ -14,9 +54,6 @@ def init_session():
         "selected_year": 2026,
         "mla_percent": 50,
         "phev_percent": 60,
-        "grid_emission": 0.21,
-        "renewable_emission": 0.05,
-        "gas_emission": 0.20,
         "grid_cost": 0.10,
         "renew_cost": 0.08,
         "gas_cost": 0.12,
@@ -26,7 +63,6 @@ def init_session():
         "scope1_emission_factor": 0.18,
         "carbon_price": 80.0,
         "electricity_mix": "100% Grid",
-        "custom_uk_emissions": {},
         "materials": {
             "lithium": 0.0,
             "nickel": 0.0,
@@ -62,21 +98,12 @@ if page == "Input Settings":
     st.session_state.phev_percent = st.slider("% of cells for PHEV", 0, 100, 100 if st.session_state.selected_year > 2030 else st.session_state.phev_percent)
 
     st.subheader("Energy Sourcing")
-    electricity_options = ["100% Grid", "PPA : Grid (70:30)", "Grid + Gas (30% demand)"]
+    electricity_options = list(custom_uk_emissions.keys())
     st.session_state.electricity_mix = st.radio("Electricity Sourcing Strategy", electricity_options, index=electricity_options.index(st.session_state.electricity_mix))
 
     st.session_state.grid_cost = st.number_input("Grid Cost (€/kWh)", value=st.session_state.grid_cost)
     st.session_state.renew_cost = st.number_input("Renewable Cost (€/kWh)", value=st.session_state.renew_cost)
     st.session_state.gas_cost = st.number_input("Gas Cost (€/kWh)", value=st.session_state.gas_cost)
-
-    st.subheader("Custom Annual CO₂ Values (UK, tCO₂)")
-    for mix in electricity_options:
-        st.markdown(f"**{mix}**")
-        for y in range(2026, 2036):
-            key = f"{mix}_{y}"
-            if key not in st.session_state.custom_uk_emissions:
-                st.session_state.custom_uk_emissions[key] = 0.0
-            st.session_state.custom_uk_emissions[key] = st.number_input(f"{y}", key=key, value=st.session_state.custom_uk_emissions[key])
 
     st.subheader("Battery Pack & Materials")
     st.session_state.pack_kwh = st.number_input("Pack capacity (kWh)", value=st.session_state.pack_kwh)
@@ -104,11 +131,10 @@ else:
     phev_percent = st.session_state.phev_percent
     mhev_percent = 0 if st.session_state.selected_year > 2030 else 100 - phev_percent
 
-    # Use custom annual emissions from UK as base
+    # Use fixed annual emissions from UK as base
     annual_emissions = []
     for y in year_range:
-        key = f"{st.session_state.electricity_mix}_{y}"
-        uk_value = st.session_state.custom_uk_emissions.get(key, 0.0)
+        uk_value = custom_uk_emissions[st.session_state.electricity_mix].get(y, 0.0)
         if st.session_state.factory == "UK":
             annual_emissions.append(uk_value)
         elif st.session_state.factory == "India":
