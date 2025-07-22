@@ -175,10 +175,10 @@ else:
             annual_emissions.append(mixed_emission)
             energy_list.append(mixed_energy * 1_000_000)
 
-    scope2_emissions = sum(annual_emissions)
+    scope2_emissions = sum(custom_uk_energy[y] * custom_emission_factors[y] for y in year_range)
     total_energy_kwh = sum(energy_list)
 
-    scope1_emissions = (total_energy_kwh / 1_000_000) * st.session_state.scope1_emission_factor
+    scope1_emissions = sum(custom_uk_energy[y] * st.session_state.scope1_emission_factor for y in year_range)
     scope3_emissions = sum((total_cells * st.session_state.materials[mat] * (st.session_state.co2_per_kg[mat] / 1000)) for mat in st.session_state.materials)
     total_emissions = scope1_emissions + scope2_emissions + scope3_emissions
 
