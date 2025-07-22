@@ -26,6 +26,7 @@ def init_session():
         "scope1_emission_factor": 0.18,
         "carbon_price": 80.0,
         "electricity_mix": "100% Grid",
+        "custom_uk_emissions": {},
         "materials": {
             "lithium": 0.0,
             "nickel": 0.0,
@@ -64,12 +65,18 @@ if page == "Input Settings":
     electricity_options = ["100% Grid", "PPA : Grid (70:30)", "Grid + Gas (30% demand)"]
     st.session_state.electricity_mix = st.radio("Electricity Sourcing Strategy", electricity_options, index=electricity_options.index(st.session_state.electricity_mix))
 
-    st.session_state.grid_emission = st.number_input("Grid Emission Factor (tCO₂/kWh)", value=st.session_state.grid_emission)
-    st.session_state.renewable_emission = st.number_input("Renewable Emission Factor (tCO₂/kWh)", value=st.session_state.renewable_emission)
-    st.session_state.gas_emission = st.number_input("Gas Emission Factor (tCO₂/kWh)", value=st.session_state.gas_emission)
     st.session_state.grid_cost = st.number_input("Grid Cost (€/kWh)", value=st.session_state.grid_cost)
     st.session_state.renew_cost = st.number_input("Renewable Cost (€/kWh)", value=st.session_state.renew_cost)
     st.session_state.gas_cost = st.number_input("Gas Cost (€/kWh)", value=st.session_state.gas_cost)
+
+    st.subheader("Custom Annual CO₂ Values (UK, tCO₂)")
+    for mix in electricity_options:
+        st.markdown(f"**{mix}**")
+        for y in range(2026, 2036):
+            key = f"{mix}_{y}"
+            if key not in st.session_state.custom_uk_emissions:
+                st.session_state.custom_uk_emissions[key] = 0.0
+            st.session_state.custom_uk_emissions[key] = st.number_input(f"{y}", key=key, value=st.session_state.custom_uk_emissions[key])
 
     st.subheader("Battery Pack & Materials")
     st.session_state.pack_kwh = st.number_input("Pack capacity (kWh)", value=st.session_state.pack_kwh)
@@ -97,25 +104,29 @@ else:
     phev_percent = st.session_state.phev_percent
     mhev_percent = 0 if st.session_state.selected_year > 2030 else 100 - phev_percent
 
-    if st.session_state.electricity_mix == "100% Grid":
-        emission_factor = st.session_state.grid_emission
-        energy_cost = st.session_state.grid_cost
-    elif st.session_state.electricity_mix == "PPA : Grid (70:30)":
-        emission_factor = 0.7 * st.session_state.renewable_emission + 0.3 * st.session_state.grid_emission
-        energy_cost = 0.7 * st.session_state.renew_cost + 0.3 * st.session_state.grid_cost
-    elif st.session_state.electricity_mix == "Grid + Gas (30% demand)":
-        emission_factor = 0.7 * st.session_state.grid_emission + 0.3 * st.session_state.gas_emission
-        energy_cost = 0.7 * st.session_state.grid_cost + 0.3 * st.session_state.gas_cost
-    else:
-        emission_factor = st.session_state.grid_emission
-        energy_cost = st.session_state.grid_cost
+    # Use custom annual emissions from UK as base
+    annual_emissions = []
+    for y in year_range:
+        key = f"{st.session_state.electricity_mix}_{y}"
+        uk_value = st.session_state.custom_uk_emissions.get(key, 0.0)
+        if st.session_state.factory == "UK":
+            annual_emissions.append(uk_value)
+        elif st.session_state.factory == "India":
+            annual_emissions.append((uk_value / 2) * 3)
+        else:
+            annual_emissions.append((uk_value + ((uk_value / 2) * 3)) / 2)  # avg of UK and India
+
+    scope2_emissions = sum(annual_emissions)
 
     total_energy_kwh = (total_cells / st.session_state.cells_per_pack) * st.session_state.pack_kwh
-    scope2_emissions = total_energy_kwh * emission_factor
     scope1_emissions = total_energy_kwh * st.session_state.scope1_emission_factor * 0.05
 
     scope3_emissions = sum((total_cells * st.session_state.materials[mat] * (st.session_state.co2_per_kg[mat] / 1000)) for mat in st.session_state.materials)
     total_emissions = scope1_emissions + scope2_emissions + scope3_emissions
+
+    energy_cost = 0.7 * st.session_state.grid_cost + 0.3 * st.session_state.renew_cost if st.session_state.electricity_mix == "PPA : Grid (70:30)" else \
+                  0.7 * st.session_state.grid_cost + 0.3 * st.session_state.gas_cost if st.session_state.electricity_mix == "Grid + Gas (30% demand)" else \
+                  st.session_state.grid_cost
 
     total_carbon_cost = total_emissions * st.session_state.carbon_price
     energy_cost_total = total_energy_kwh * energy_cost
