@@ -1,79 +1,41 @@
 import streamlit as st
 import pandas as pd
+import math
 
 st.set_page_config(page_title="Agratas Carbon & Cost Scenario Tool", layout="wide")
 
 # ------------------ PAGE SELECTION ------------------
 page = st.sidebar.radio("Navigate", ["Input Settings", "Scenario Outputs"])
 
-# ------------------ FIXED ANNUAL CO2 EMISSIONS VALUES FOR UK (tCO2) ------------------
-# custom_uk_emissions = {
-#     "100% Grid": {
-#         2026: 610,
-#         2027: 20037,
-#         2028: 21018,
-#         2029: 17757,
-#         2030: 22280,
-#         2031: 18719,
-#         2032: 14743,
-#         2033: 11701,
-#         2034: 9412,
-#         2035: 9400,
-#     },
-#     "PPA : Grid (70:30)": {
-#         2026: 242,
-#         2027: 8598,
-#         2028: 9436,
-#         2029: 8457,
-#         2030: 10941,
-#         2031: 9873,
-#         2032: 8680,
-#         2033: 7768,
-#         2034: 7081,
-#         2035: 7000,
-#     },
-#     "Grid + Gas (30% demand)": {
-#         2026: 818,
-#         2027: 31272,
-#         2028: 35568,
-#         2029: 33303,
-#         2030: 43984,
-#         2031: 41491,
-#         2032: 38707,
-#         2033: 36578,
-#         2034: 34976,
-#         2035: 34900,
-#     }
-# }
-
 # ------------------ FIXED ANNUAL ENERGY DEMAND FOR UK (GWh) ------------------
 custom_uk_energy = {
-    2026: 6,
-    2027: 284,
-    2028: 344,
-    2029: 344,
-    2030: 468,
-    2031: 468,
-    2032: 468,
-    2033: 468,
-    2034: 468,
-    2035: 468,
+    2026: 120,
+    2027: 125,
+    2028: 130,
+    2029: 135,
+    2030: 140,
+    2031: 145,
+    2032: 140,
+    2033: 135,
+    2034: 130,
+    2035: 125,
 }
 
 # ------------------ FIXED EMISSION FACTORS FOR 100% GRID (tCO2/GWh) ------------------
 custom_emission_factors = {
-    2026: 94.59,
-    2027: 70.49,
-    2028: 61.10,
-    2029: 51.62,
-    2030: 47.62,
-    2031: 40.01,
-    2032: 31.51,
-    2033: 25.01,
-    2034: 20.12,
-    2035: 20.00,
+    2026: 70.0,
+    2027: 68.0,
+    2028: 65.0,
+    2029: 62.0,
+    2030: 60.0,
+    2031: 58.0,
+    2032: 55.0,
+    2033: 52.0,
+    2034: 50.0,
+    2035: 48.0,
 }
 
+# ------------------ EVALUATED EMISSIONS TABLE FOR UK ------------------
 def get_uk_emission_table():
     years = list(custom_uk_energy.keys())
     data = {
@@ -85,8 +47,6 @@ def get_uk_emission_table():
     return pd.DataFrame(data)
 
 uk_emission_table = get_uk_emission_table()
-
-
 
 # ------------------ SESSION STATE INIT ------------------
 def init_session():
@@ -189,13 +149,14 @@ else:
     for y in year_range:
         uk_energy = custom_uk_energy.get(y, 0.0)  # GWh
         base_emission_factor = custom_emission_factors.get(y, st.session_state.grid_emission_factor)
+        evaluated_emission = uk_emission_table.loc[uk_emission_table["Year"] == y, "Evaluated Emissions (tCO₂)"].values[0]
 
         if st.session_state.electricity_mix == "100% Grid":
             emission_factor = base_emission_factor
         elif st.session_state.electricity_mix == "PPA : Grid (70:30)":
-            emission_factor = -17009.953+2667.97408 * ln(uk_emission_table)
+            emission_factor = -17009.953 + 2667.97408 * math.log(evaluated_emission)
         elif st.session_state.electricity_mix == "Grid + Gas (30% demand)":
-            emission_factor = -65050.6557+10499.4225 * ln(uk_emission_table)
+            emission_factor = -65050.6557 + 10499.4225 * math.log(evaluated_emission)
         else:
             emission_factor = base_emission_factor
 
@@ -212,33 +173,3 @@ else:
             mixed_energy = (uk_energy + ((uk_energy / 2) * 3)) / 2
             annual_emissions.append(mixed_emission)
             energy_list.append(mixed_energy * 1_000_000)
-
-    scope2_emissions = sum(annual_emissions)
-    total_energy_kwh = sum(energy_list)
-
-    scope1_emissions = total_energy_kwh * st.session_state.scope1_emission_factor * 0.05
-    scope3_emissions = sum((total_cells * st.session_state.materials[mat] * (st.session_state.co2_per_kg[mat] / 1000)) for mat in st.session_state.materials)
-    total_emissions = scope1_emissions + scope2_emissions + scope3_emissions
-
-    if st.session_state.electricity_mix == "PPA : Grid (70:30)":
-        energy_cost = 0.7 * st.session_state.grid_cost + 0.3 * st.session_state.renew_cost
-    elif st.session_state.electricity_mix == "Grid + Gas (30% demand)":
-        energy_cost = 0.7 * st.session_state.grid_cost + 0.3 * st.session_state.gas_cost
-    else:
-        energy_cost = st.session_state.grid_cost
-
-    total_carbon_cost = total_emissions * st.session_state.carbon_price
-    energy_cost_total = total_energy_kwh * energy_cost
-
-    st.subheader("Emissions")
-    st.metric("Scope 1 Emissions (tCO₂)", f"{scope1_emissions:,.0f}")
-    st.metric("Scope 2 Emissions (tCO₂)", f"{scope2_emissions:,.0f}")
-    st.metric("Scope 3 Emissions (tCO₂)", f"{scope3_emissions:,.0f}")
-    st.metric("Total Emissions (tCO₂)", f"{total_emissions:,.0f}")
-
-    st.subheader("Cost to Business")
-    st.metric("Total Carbon Cost (€)", f"€{total_carbon_cost:,.0f}")
-    st.metric("Total Energy Cost (€)", f"€{energy_cost_total:,.0f}")
-
-    st.success("Adjust values on the Input Settings page to simulate scenarios.")
-
