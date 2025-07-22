@@ -23,7 +23,7 @@ custom_uk_energy = {
 
 # ------------------ FIXED EMISSION FACTORS FOR 100% GRID (tCO2/GWh) ------------------
 custom_emission_factors = {
-    2026: 70,
+    2026: 70.0,
     2027: 68.0,
     2028: 65.0,
     2029: 62.0,
@@ -178,7 +178,7 @@ else:
     scope2_emissions = sum(annual_emissions)
     total_energy_kwh = sum(energy_list)
 
-    scope1_emissions = total_energy_kwh * st.session_state.scope1_emission_factor * 0.05
+    scope1_emissions = (total_energy_kwh / 1_000_000) * st.session_state.scope1_emission_factor
     scope3_emissions = sum((total_cells * st.session_state.materials[mat] * (st.session_state.co2_per_kg[mat] / 1000)) for mat in st.session_state.materials)
     total_emissions = scope1_emissions + scope2_emissions + scope3_emissions
 
