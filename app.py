@@ -57,7 +57,8 @@ def init_session():
         "grid_cost": 0.10,
         "renew_cost": 0.08,
         "gas_cost": 0.12,
-        "pack_kwh": 50.0,
+        "mla_pack_kwh": 50.0,
+        "ema_pack_kwh": 75.0,
         "cells_per_pack": 100.0,
         "chemistry": "LFP",
         "scope1_emission_factor": 0.18,
@@ -106,7 +107,8 @@ if page == "Input Settings":
     st.session_state.gas_cost = st.number_input("Gas Cost (€/kWh)", value=st.session_state.gas_cost)
 
     st.subheader("Battery Pack & Materials")
-    st.session_state.pack_kwh = st.number_input("Pack capacity (kWh)", value=st.session_state.pack_kwh)
+    st.session_state.mla_pack_kwh = st.number_input("MLA Pack capacity (kWh)", value=st.session_state.mla_pack_kwh)
+    st.session_state.ema_pack_kwh = st.number_input("EMA Pack capacity (kWh)", value=st.session_state.ema_pack_kwh)
     st.session_state.cells_per_pack = st.number_input("Cells per pack", value=st.session_state.cells_per_pack)
     st.session_state.chemistry = st.selectbox("Battery Chemistry", ["LFP", "NMC 811", "NMC 622"], index=["LFP", "NMC 811", "NMC 622"].index(st.session_state.chemistry))
 
@@ -128,6 +130,9 @@ else:
     num_lines = lines_by_factory.get(st.session_state.factory, 2)
 
     total_cells = num_lines * 4_150_000 * len(year_range)
+    mla_cells = total_cells * (st.session_state.mla_percent / 100)
+    ema_cells = total_cells - mla_cells
+
     phev_percent = st.session_state.phev_percent
     mhev_percent = 0 if st.session_state.selected_year > 2030 else 100 - phev_percent
 
@@ -144,7 +149,9 @@ else:
 
     scope2_emissions = sum(annual_emissions)
 
-    total_energy_kwh = (total_cells / st.session_state.cells_per_pack) * st.session_state.pack_kwh
+    total_energy_kwh = (mla_cells / st.session_state.cells_per_pack) * st.session_state.mla_pack_kwh + \
+                       (ema_cells / st.session_state.cells_per_pack) * st.session_state.ema_pack_kwh
+
     scope1_emissions = total_energy_kwh * st.session_state.scope1_emission_factor * 0.05
 
     scope3_emissions = sum((total_cells * st.session_state.materials[mat] * (st.session_state.co2_per_kg[mat] / 1000)) for mat in st.session_state.materials)
