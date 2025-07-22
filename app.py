@@ -176,30 +176,3 @@ else:
             energy_list.append(mixed_energy * 1_000_000)
 
     scope2_emissions = sum(custom_uk_energy[y] * custom_emission_factors[y] for y in year_range)
-    total_energy_kwh = sum(energy_list)
-
-    scope1_emissions = sum(custom_uk_energy[y] * st.session_state.scope1_emission_factor for y in year_range)
-    scope3_emissions = sum((total_cells * st.session_state.materials[mat] * (st.session_state.co2_per_kg[mat] / 1000)) for mat in st.session_state.materials)
-    total_emissions = scope1_emissions + scope2_emissions + scope3_emissions
-
-    if st.session_state.electricity_mix == "PPA : Grid (70:30)":
-        energy_cost = 0.7 * st.session_state.grid_cost + 0.3 * st.session_state.renew_cost
-    elif st.session_state.electricity_mix == "Grid + Gas (30% demand)":
-        energy_cost = 0.7 * st.session_state.grid_cost + 0.3 * st.session_state.gas_cost
-    else:
-        energy_cost = st.session_state.grid_cost
-
-    total_carbon_cost = total_emissions * st.session_state.carbon_price
-    energy_cost_total = total_energy_kwh * energy_cost
-
-    st.subheader("Emissions")
-    st.metric("Scope 1 Emissions (tCO₂)", f"{scope1_emissions:,.0f}")
-    st.metric("Scope 2 Emissions (tCO₂)", f"{scope2_emissions:,.0f}")
-    st.metric("Scope 3 Emissions (tCO₂)", f"{scope3_emissions:,.0f}")
-    st.metric("Total Emissions (tCO₂)", f"{total_emissions:,.0f}")
-
-    st.subheader("Cost to Business")
-    st.metric("Total Carbon Cost (€)", f"€{total_carbon_cost:,.0f}")
-    st.metric("Total Energy Cost (€)", f"€{energy_cost_total:,.0f}")
-
-    st.success("Adjust values on the Input Settings page to simulate scenarios.")
