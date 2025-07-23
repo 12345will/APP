@@ -170,9 +170,21 @@ else:
         else:  # UK
             energy_gwh = uk_energy
 
-        emissions = energy_gwh * emission_factor  # tCO₂
+        # Step 1: Calculate baseline (100% Grid) emissions
+        base_emissions = energy_gwh * emission_factor  # tCO₂
+
+        # Step 2: Apply sourcing adjustment
+        if st.session_state.electricity_mix == "100% Grid":
+            emissions = base_emissions
+        elif st.session_state.electricity_mix == "PPA : Grid (70:30)":
+            emissions = -17009.953 + 2667.97408 * math.log(base_emissions)
+        elif st.session_state.electricity_mix == "Grid + Gas (30% demand)":
+            emissions = -65050.6557 + 10499.4225 * math.log(base_emissions)
+        else:
+            emissions = base_emissions  # fallback
+
         annual_emissions.append(emissions)
-        annual_energy_kwh.append(energy_gwh * 1_000_000)  # for cost
+        annual_energy_kwh.append(energy_gwh * 1_000_000)
 
 
     total_scope1_scope2 = sum(annual_emissions)
