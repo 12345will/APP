@@ -68,80 +68,88 @@ def init_session():
         "carbon_price": 80.0,
         "grid_emission_factor": 70.0,
         "electricity_mix": "100% Grid",
-        "materials": {
-            "lithium": 0.0,
-            "nickel": 0.0,
-            "cobalt": 0.0,
-            "manganese": 0.0,
-            "graphite": 0.0,
-            "aluminum": 0.0,
-            "copper": 0.0
-        },
-        "co2_per_kg": {
-            "lithium": 5.0,
-            "nickel": 8.0,
-            "cobalt": 10.0,
-            "manganese": 4.0,
-            "graphite": 2.5,
-            "aluminum": 9.0,
-            "copper": 3.5
-        }
     }
+
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
 
-init_session()
+    # Materials and CO₂ per kg
+    materials = {
+        "lithium": 0.0,
+        "nickel": 0.0,
+        "cobalt": 0.0,
+        "manganese": 0.0,
+        "graphite": 0.0,
+        "aluminum": 0.0,
+        "copper": 0.0,
+    }
+    co2_per_kg = {
+        "lithium": 5.0,
+        "nickel": 8.0,
+        "cobalt": 10.0,
+        "manganese": 4.0,
+        "graphite": 2.5,
+        "aluminum": 9.0,
+        "copper": 3.5,
+    }
+
+    if "materials" not in st.session_state:
+        st.session_state.materials = materials
+    if "co2_per_kg" not in st.session_state:
+        st.session_state.co2_per_kg = co2_per_kg
+
+    # Initialize dynamic keys for each material value
+    for mat in materials:
+        if f"mat_{mat}" not in st.session_state:
+            st.session_state[f"mat_{mat}"] = materials[mat]
+        if f"co2_{mat}" not in st.session_state:
+            st.session_state[f"co2_{mat}"] = co2_per_kg[mat]
+
 
 # ------------------ INPUT PAGE ------------------
 if page == "Input Settings":
     st.title("⚙️ Model Configuration")
 
-    # ----- Factory & Timeline Selection -----
+    # General setup
     st.selectbox("Factory Location", ["India", "UK", "Global Average"], key="factory")
     st.radio("Year Mode", ["Single Year", "Cumulative (2026–YYYY)"], key="year_mode")
-    st.slider("Select Year", 2026, 2035, value=st.session_state.selected_year, key="selected_year")
-    st.slider("% MLA production", 0, 100, value=st.session_state.mla_percent, key="mla_percent")
+    st.slider("Select Year", 2026, 2035, key="selected_year")
+    st.slider("% MLA production", 0, 100, key="mla_percent")
 
     phev_default = 100 if st.session_state.selected_year > 2030 else st.session_state.phev_percent
     st.slider("% of cells for PHEV", 0, 100, value=phev_default, key="phev_percent")
 
-    # ----- Energy Sourcing -----
+    # Energy sourcing
     st.subheader("Energy Sourcing")
-    electricity_options = ["100% Grid", "PPA : Grid (70:30)", "Grid + Gas (30% demand)"]
-    st.radio("Electricity Sourcing Strategy", electricity_options, key="electricity_mix")
-    st.number_input("Grid Cost (€/kWh)", value=st.session_state.grid_cost, key="grid_cost")
-    st.number_input("Renewable Cost (€/kWh)", value=st.session_state.renew_cost, key="renew_cost")
-    st.number_input("Gas Cost (€/kWh)", value=st.session_state.gas_cost, key="gas_cost")
-    st.number_input("Grid Emission Factor (tCO₂/GWh)", value=st.session_state.grid_emission_factor, key="grid_emission_factor")
+    st.radio("Electricity Sourcing Strategy", ["100% Grid", "PPA : Grid (70:30)", "Grid + Gas (30% demand)"], key="electricity_mix")
+    st.number_input("Grid Cost (€/kWh)", key="grid_cost")
+    st.number_input("Renewable Cost (€/kWh)", key="renew_cost")
+    st.number_input("Gas Cost (€/kWh)", key="gas_cost")
+    st.number_input("Grid Emission Factor (tCO₂/GWh)", key="grid_emission_factor")
 
     st.info("To override yearly emission factors for 100% Grid, edit the `custom_emission_factors` dictionary in code.")
 
-    # ----- Battery Pack Configuration -----
+    # Battery setup
     st.subheader("Battery Pack & Materials")
-    st.number_input("MLA Pack capacity (kWh)", value=st.session_state.mla_pack_kwh, key="mla_pack_kwh")
-    st.number_input("EMA Pack capacity (kWh)", value=st.session_state.ema_pack_kwh, key="ema_pack_kwh")
-    st.number_input("MLA Cells per pack", value=st.session_state.mla_cells_per_pack, key="mla_cells_per_pack")
-    st.number_input("EMA Cells per pack", value=st.session_state.ema_cells_per_pack, key="ema_cells_per_pack")
+    st.number_input("MLA Pack capacity (kWh)", key="mla_pack_kwh")
+    st.number_input("EMA Pack capacity (kWh)", key="ema_pack_kwh")
+    st.number_input("MLA Cells per pack", key="mla_cells_per_pack")
+    st.number_input("EMA Cells per pack", key="ema_cells_per_pack")
     st.selectbox("Battery Chemistry", ["LFP", "NMC 811", "NMC 622"], key="chemistry")
 
-    # ----- Materials per Cell -----
+    # Materials
     st.subheader("Cell Materials (kg per cell)")
     for mat in st.session_state.materials:
-        key = f"mat_{mat}"
-        default = st.session_state.materials[mat]
-        st.number_input(f"{mat.capitalize()} per cell (kg)", value=default, key=key)
+        st.number_input(f"{mat.capitalize()} per cell (kg)", key=f"mat_{mat}")
 
-    # ----- CO₂ per Material -----
-    st.subheader("Embedded CO₂ (tCO₂ per ton of material)")
+    st.subheader("Embedded CO₂ (tCO₂/ton)")
     for mat in st.session_state.co2_per_kg:
-        key = f"co2_{mat}"
-        default = st.session_state.co2_per_kg[mat]
-        st.number_input(f"tCO₂/ton - {mat.capitalize()}", value=default, key=key)
+        st.number_input(f"tCO₂/ton - {mat.capitalize()}", key=f"co2_{mat}")
 
-    # ----- Policy Parameters -----
-    st.number_input("Scope 1 Emission Factor (tCO₂/kWh)", value=st.session_state.scope1_emission_factor, key="scope1_emission_factor")
-    st.number_input("Carbon Price (€/tCO₂)", value=st.session_state.carbon_price, key="carbon_price")
+    # Policy settings
+    st.number_input("Scope 1 Emission Factor (tCO₂/kWh)", key="scope1_emission_factor")
+    st.number_input("Carbon Price (€/tCO₂)", key="carbon_price")
 
 # ------------------ OUTPUT PAGE ------------------
 else:
