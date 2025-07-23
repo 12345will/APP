@@ -9,7 +9,7 @@ page = st.sidebar.radio("Navigate", ["Input Settings", "Scenario Outputs"])
 
 # ------------------ FIXED ANNUAL ENERGY DEMAND FOR UK (GWh) ------------------
 custom_uk_energy = {
-    2026: 6,
+    2026: 100,
     2027: 125,
     2028: 130,
     2029: 135,
@@ -23,7 +23,7 @@ custom_uk_energy = {
 
 # ------------------ FIXED EMISSION FACTORS FOR 100% GRID (tCO2/GWh) ------------------
 custom_emission_factors = {
-    2026: 94.59,
+    2026: 70,
     2027: 68.0,
     2028: 65.0,
     2029: 62.0,
@@ -160,43 +160,39 @@ else:
     energy_list = []
 
     for y in year_range:
-        uk_energy = custom_uk_energy.get(y, 0.0)
-        base_emission_factor = custom_emission_factors.get(y, st.session_state.grid_emission_factor)
+        # Step 1: Get base energy and emission factor for UK
+        uk_energy = custom_uk_energy.get(y, 0.0)  # in GWh
+        base_emission_factor = custom_emission_factors.get(y, st.session_state.grid_emission_factor)  # in tCO₂/GWh
         energy_demand_gwh = uk_energy
 
-        # Apply sourcing strategy
+        # Step 2: Adjust for energy sourcing strategy (still keeping units in GWh)
         if st.session_state.electricity_mix == "100% Grid":
             emission_factor = base_emission_factor
             cost_per_kwh = st.session_state.grid_cost
         elif st.session_state.electricity_mix == "PPA : Grid (70:30)":
-            emission_factor = base_emission_factor * 0.3  # Assume 70% renewables = 0 emission
+            emission_factor = base_emission_factor * 0.3  # Assume 70% renewables = 0 tCO₂
             cost_per_kwh = 0.7 * st.session_state.renew_cost + 0.3 * st.session_state.grid_cost
         elif st.session_state.electricity_mix == "Grid + Gas (30% demand)":
-            emission_factor = base_emission_factor * 0.7 + st.session_state.scope1_emission_factor * 0.3 * 1000  # scope1 in tCO₂/MWh
+            emission_factor = base_emission_factor * 0.7 + 70 * 0.3  # Assume 70 tCO₂/GWh for gas
             cost_per_kwh = 0.7 * st.session_state.grid_cost + 0.3 * st.session_state.gas_cost
         else:
             emission_factor = base_emission_factor
             cost_per_kwh = st.session_state.grid_cost
 
-        # Adjust for factory
+        # Step 3: Adjust for factory location
         if st.session_state.factory == "India":
             energy_demand_gwh = (uk_energy / 2) * 3
         elif st.session_state.factory == "Global Average":
             energy_demand_gwh = (uk_energy + ((uk_energy / 2) * 3)) / 2
 
-        energy_mwh = energy_demand_gwh * 1000
-        energy_kwh = energy_mwh * 1000
+        # Step 4: Calculate Scope 1 + 2 emissions (no conversions)
+        scope1_scope2 = energy_demand_gwh * emission_factor  # tCO₂
+        annual_emissions.append(scope1_scope2)
+        energy_list.append(energy_demand_gwh * 1_000_000)  # kWh, for cost calculation
 
-        scope2 = energy_demand_gwh * emission_factor
-        scope1 = energy_mwh * st.session_state.scope1_emission_factor
-
-        annual_emissions.append(scope1 + scope2)
-        energy_list.append(energy_kwh)
-
-    total_scope1_scope2 = sum(annual_emissions)
-    total_energy_kwh = sum(energy_list)
-
-    # Total cost calculations
+    # Totals
+    total_scope1_scope2 = sum(annual_emissions)  # tCO₂
+    total_energy_kwh = sum(energy_list)          # kWh
     carbon_cost = total_scope1_scope2 * st.session_state.carbon_price
     energy_cost = total_energy_kwh * cost_per_kwh
     total_emissions_all = total_scope1_scope2 + total_scope3_emissions
@@ -213,7 +209,7 @@ else:
     st.write(f"**Scope 3 Materials Total:** {total_scope3_emissions:,.0f} tCO₂")
 
     st.subheader("⚡ Total Energy Demand")
-    st.write(f"{total_energy_kwh/1e6:.2f} GWh")
+    st.write(f"{total_energy_kwh / 1e6:.2f} GWh")
 
     # Optional: Emissions over time
     if len(year_range) > 1:
@@ -226,3 +222,4 @@ else:
 
         st.subheader("📄 Detailed Annual Emissions")
         st.dataframe(emissions_df)
+
