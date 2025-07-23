@@ -135,14 +135,15 @@ else:
             energy_demand = uk_energy
 
         if st.session_state.electricity_mix == "100% Grid":
+            emission_factor = custom_emission_factors[y]
             scope1_scope2 = energy_demand * emission_factor
         elif st.session_state.electricity_mix == "PPA : Grid (70:30)":
-            scope1_scope2 = -17009.953 + 2667.97408 * math.log(energy_demand)
+            scope1_scope2 = 41.13761 * (energy_demand ** 0.551674)
         elif st.session_state.electricity_mix == "Grid + Gas (30% demand)":
-            scope1_scope2 = -65050.6557 + 10499.4225 * math.log(energy_demand)
+            scope1_scope2 = 596.09563 * (energy_demand ** 0.423023)
         else:
-            scope1_scope2 = energy_demand * emission_factor
-
+            scope1_scope2 = energy_demand * custom_emission_factors[y]
+            
         total_scope1_scope2 += scope1_scope2
 
         for mat, kg_per_cell in st.session_state.materials.items():
