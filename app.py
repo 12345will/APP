@@ -139,11 +139,9 @@ else:
     # Determine year range
     year_range = list(range(2026, st.session_state.selected_year + 1)) if st.session_state.year_mode.startswith("Cumulative") else [st.session_state.selected_year]
 
-    # Factory production lines
+    # Total cells produced (used for Scope 3)
     lines_by_factory = {"India": 3, "UK": 2, "Global Average": 2.5}
     num_lines = lines_by_factory.get(st.session_state.factory, 2)
-
-    # Total cells produced
     total_cells = num_lines * 4_150_000 * len(year_range)
     mla_cells = total_cells * (st.session_state.mla_percent / 100)
     ema_cells = total_cells - mla_cells
@@ -155,46 +153,21 @@ else:
         co2_per_ton = st.session_state.co2_per_kg.get(mat, 0)
         total_scope3_emissions += tons_total * co2_per_ton
 
-    # Emissions & Energy Tracking
+    # Emissions from UK data only (Scope 1 + 2)
     annual_emissions = []
-    energy_list = []
+    annual_energy_kwh = []
 
     for y in year_range:
-        # Step 1: Get base energy and emission factor for UK
-        uk_energy = custom_uk_energy.get(y, 0.0)  # in GWh
-        base_emission_factor = custom_emission_factors.get(y, st.session_state.grid_emission_factor)  # in tCO₂/GWh
-        energy_demand_gwh = uk_energy
+        energy_gwh = custom_uk_energy.get(y, 0)
+        emission_factor = custom_emission_factors.get(y, 0)
+        emissions = energy_gwh * emission_factor  # simple multiplication, tCO₂
+        annual_emissions.append(emissions)
+        annual_energy_kwh.append(energy_gwh * 1_000_000)
 
-        # Step 2: Adjust for energy sourcing strategy (still keeping units in GWh)
-        if st.session_state.electricity_mix == "100% Grid":
-            emission_factor = base_emission_factor
-            cost_per_kwh = st.session_state.grid_cost
-        elif st.session_state.electricity_mix == "PPA : Grid (70:30)":
-            emission_factor = base_emission_factor * 0.3  # Assume 70% renewables = 0 tCO₂
-            cost_per_kwh = 0.7 * st.session_state.renew_cost + 0.3 * st.session_state.grid_cost
-        elif st.session_state.electricity_mix == "Grid + Gas (30% demand)":
-            emission_factor = base_emission_factor * 0.7 + 70 * 0.3  # Assume 70 tCO₂/GWh for gas
-            cost_per_kwh = 0.7 * st.session_state.grid_cost + 0.3 * st.session_state.gas_cost
-        else:
-            emission_factor = base_emission_factor
-            cost_per_kwh = st.session_state.grid_cost
-
-        # Step 3: Adjust for factory location
-        if st.session_state.factory == "India":
-            energy_demand_gwh = (uk_energy / 2) * 3
-        elif st.session_state.factory == "Global Average":
-            energy_demand_gwh = (uk_energy + ((uk_energy / 2) * 3)) / 2
-
-        # Step 4: Calculate Scope 1 + 2 emissions (no conversions)
-        scope1_scope2 = energy_demand_gwh * emission_factor  # tCO₂
-        annual_emissions.append(scope1_scope2)
-        energy_list.append(energy_demand_gwh * 1_000_000)  # kWh, for cost calculation
-
-    # Totals
-    total_scope1_scope2 = sum(annual_emissions)  # tCO₂
-    total_energy_kwh = sum(energy_list)          # kWh
+    total_scope1_scope2 = sum(annual_emissions)
+    total_energy_kwh = sum(annual_energy_kwh)
     carbon_cost = total_scope1_scope2 * st.session_state.carbon_price
-    energy_cost = total_energy_kwh * cost_per_kwh
+    energy_cost = total_energy_kwh * st.session_state.grid_cost
     total_emissions_all = total_scope1_scope2 + total_scope3_emissions
 
     # OUTPUT METRICS
@@ -205,20 +178,21 @@ else:
     col3.metric("Energy Cost (€)", f"{energy_cost:,.0f}")
 
     st.subheader("🔍 Emissions Breakdown")
-    st.write(f"**Scope 1 & 2 Total:** {total_scope1_scope2:,.0f} tCO₂")
-    st.write(f"**Scope 3 Materials Total:** {total_scope3_emissions:,.0f} tCO₂")
+    st.write(f"**Scope 1 & 2 (UK-based only):** {total_scope1_scope2:,.0f} tCO₂")
+    st.write(f"**Scope 3 Materials:** {total_scope3_emissions:,.0f} tCO₂")
 
     st.subheader("⚡ Total Energy Demand")
     st.write(f"{total_energy_kwh / 1e6:.2f} GWh")
 
-    # Optional: Emissions over time
+    # Emissions by year (if cumulative)
     if len(year_range) > 1:
         emissions_df = pd.DataFrame({
             "Year": year_range,
-            "Scope 1 + 2 Emissions (tCO₂)": annual_emissions,
-            "Energy Demand (kWh)": energy_list
+            "UK Energy Demand (GWh)": [custom_uk_energy[y] for y in year_range],
+            "Emission Factor (tCO₂/GWh)": [custom_emission_factors[y] for y in year_range],
+            "Scope 1 + 2 Emissions (tCO₂)": annual_emissions
         })
-        st.line_chart(emissions_df.set_index("Year"))
+        st.line_chart(emissions_df.set_index("Year")["Scope 1 + 2 Emissions (tCO₂)"])
 
         st.subheader("📄 Detailed Annual Emissions")
         st.dataframe(emissions_df)
