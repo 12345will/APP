@@ -158,11 +158,22 @@ else:
     annual_energy_kwh = []
 
     for y in year_range:
-        energy_gwh = custom_uk_energy.get(y, 0)
+        uk_energy = custom_uk_energy.get(y, 0)
         emission_factor = custom_emission_factors.get(y, 0)
-        emissions = energy_gwh * emission_factor  # simple multiplication, tCO₂
+
+        # Adjust energy demand by factory
+        if st.session_state.factory == "India":
+            energy_gwh = (3 / 2) * uk_energy
+        elif st.session_state.factory == "Global Average":
+            india_energy = (3 / 2) * uk_energy
+            energy_gwh = (uk_energy + india_energy) / 2
+        else:  # UK
+            energy_gwh = uk_energy
+
+        emissions = energy_gwh * emission_factor  # tCO₂
         annual_emissions.append(emissions)
-        annual_energy_kwh.append(energy_gwh * 1_000_000)
+        annual_energy_kwh.append(energy_gwh * 1_000_000)  # for cost
+
 
     total_scope1_scope2 = sum(annual_emissions)
     total_energy_kwh = sum(annual_energy_kwh)
