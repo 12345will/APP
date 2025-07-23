@@ -96,10 +96,10 @@ init_session()
 # ------------------ INPUT PAGE ------------------
 if page == "Input Settings":
     st.title("⚙️ Model Configuration")
-    st.session_state.factory = st.selectbox("Factory Location", ["India", "UK", "Global Average"])
-    st.session_state.year_mode = st.radio("Year Mode", ["Single Year", "Cumulative (2026–YYYY)"])
-    st.session_state.selected_year = st.slider("Select Year", 2026, 2035, value=st.session_state.selected_year)
-    st.session_state.mla_percent = st.slider("% MLA production", 0, 100, value=st.session_state.mla_percent)
+    st.selectbox("Factory Location", ["India", "UK", "Global Average"], key="factory")
+    st.radio("Year Mode", ["Single Year", "Cumulative (2026–YYYY)"], key="year_mode")
+    st.slider("Select Year", 2026, 2035, value=st.session_state.selected_year, key="selected_year")
+    st.slider("% MLA production", 0, 100, value=st.session_state.mla_percent, key="mla_percent")
     st.session_state.phev_percent = st.slider(
         "% of cells for PHEV",
         0,
